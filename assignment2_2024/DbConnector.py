@@ -5,7 +5,7 @@ class DbConnector:
                  HOST="127.0.0.1",
                  DATABASE="geolife_db",
                  USER="root",
-                 PASSWORD="my-secret-password"):
+                 PASSWORD="kjelhus123"):
         # Connect to the database
         try:
             self.db_connection = mysql.connect(host=HOST, database=DATABASE, user=USER, password=PASSWORD, port=3306)
