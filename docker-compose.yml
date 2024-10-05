@@ -10,7 +10,6 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: kjelhus123
       MYSQL_DATABASE: geolife_db
-      MYSQL_USER: root
     volumes:
       - mysql_data:/var/lib/mysql  # Persistent data storage
     networks:
