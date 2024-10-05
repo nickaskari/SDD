@@ -2,21 +2,19 @@ from DbConnector import DbConnector
 from tabulate import tabulate
 
 
-class ExampleProgram:
+class DBSetup:
 
     def __init__(self):
         self.connection = DbConnector()
         self.db_connection = self.connection.db_connection
         self.cursor = self.connection.cursor
 
-    def create_table(self, table_name):
-        query = """CREATE TABLE IF NOT EXISTS %s (
-                   id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-                   name VARCHAR(30))
-                """
-        # This adds table_name to the %s variable and executes the query
-        self.cursor.execute(query % table_name)
+    def create_table(self, table_name, columns_definition):
+        query = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns_definition})"
+        
+        self.cursor.execute(query)
         self.db_connection.commit()
+
 
     def insert_data(self, table_name):
         names = ['Bobby', 'Mc', 'McSmack', 'Board']
@@ -52,13 +50,45 @@ class ExampleProgram:
 def main():
     program = None
     try:
-        program = ExampleProgram()
-        program.create_table(table_name="Person")
-        program.insert_data(table_name="Person")
-        _ = program.fetch_data(table_name="Person")
-        program.drop_table(table_name="Person")
-        # Check that the table is dropped
-        program.show_tables()
+        program = DBSetup()
+
+        # User table. has_labels can be Null (be default)
+        program.create_table(
+            table_name="User",
+            columns_definition="""
+                id VARCHAR(50) NOT NULL PRIMARY KEY,
+                has_labels BOOLEAN NOT NULL
+            """
+        )
+
+        # Creating the Activity table
+        program.create_table(
+            table_name="Activity",
+            columns_definition="""
+                id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
+                user_id VARCHAR(50) NOT NULL,
+                transportation_mode VARCHAR(50),
+                start_date_time DATETIME NOT NULL,
+                end_date_time DATETIME NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES User(id)
+            """
+        )
+
+        program.create_table(
+            table_name="TrackPoint",
+            columns_definition="""
+                id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
+                activity_id INT NOT NULL,
+                lat DOUBLE NOT NULL,
+                lon DOUBLE NOT NULL,
+                altitude INT,
+                date_days DOUBLE,
+                date_time DATETIME NOT NULL,
+                FOREIGN KEY (activity_id) REFERENCES Activity(id)
+            """
+        )
+   
+        
     except Exception as e:
         print("ERROR: Failed to use database:", e)
     finally:
