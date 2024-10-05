@@ -40,3 +40,13 @@ When you're done and want to stop the running containers, use:
 docker-compose down
 ```
 
+# Setting Up Virtual Environment
+
+Creating a virtual environment called sddpr1
+```sh
+python3.10 -m venv sddpr1 
+```
+Activates the virtual environment sddpr1 for use.
+```sh
+source sddpr1/bin/activate
+```
