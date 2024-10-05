@@ -1,5 +1,7 @@
+import time
 from DbConnector import DbConnector
 from tabulate import tabulate
+import os
 
 
 class DBSetup:
@@ -16,14 +18,51 @@ class DBSetup:
         self.db_connection.commit()
 
 
-    def insert_data(self, table_name):
-        names = ['Bobby', 'Mc', 'McSmack', 'Board']
-        for name in names:
-            # Take note that the name is wrapped in '' --> '%s' because it is a string,
-            # while an int would be %s etc
-            query = "INSERT INTO %s (name) VALUES ('%s')"
-            self.cursor.execute(query % (table_name, name))
+    def insert_user(self, user_id, has_labels):  
+        insert_query = """
+            INSERT INTO User (id, has_labels)
+            VALUES (%s, %s)
+        """
+
+        self.cursor.execute(insert_query, (user_id, has_labels))
         self.db_connection.commit()
+        print(f"Inserted user with ID: {user_id}, Has Labels: {has_labels}")
+    
+    def insert_activity(self, user_id):
+        insert_query = """
+            INSERT INTO Activity (user_id)
+            VALUES (%s)
+        """
+
+        self.cursor.execute(insert_query, (user_id,))
+        self.db_connection.commit()
+        activity_id = self.cursor.lastrowid
+
+        print(f"Inserted activity with ID: {activity_id} for user ID: {user_id}")
+        return activity_id
+    
+    def update_activity(db_setup, activity_id, transportation_mode, start_time, end_time):
+        update_query = """
+            UPDATE Activity
+            SET transportation_mode = %s,
+                start_date_time = %s,
+                end_date_time = %s
+            WHERE id = %s
+        """
+
+        db_setup.cursor.execute(update_query, (transportation_mode, start_time, end_time, activity_id))
+        db_setup.db_connection.commit()
+    
+    def batch_insert_trackpoints(self, trackpoints):
+        insert_query = """
+            INSERT INTO TrackPoint (activity_id, lat, lon, altitude, date_days, date_time)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+
+        self.cursor.executemany(insert_query, trackpoints)
+        self.db_connection.commit()
+
+        print(f"Inserted {len(trackpoints)} trackpoints successfully.")
 
     def fetch_data(self, table_name):
         query = "SELECT * FROM %s"
@@ -40,20 +79,99 @@ class DBSetup:
         print("Dropping table %s..." % table_name)
         query = "DROP TABLE %s"
         self.cursor.execute(query % table_name)
+    
+    def drop_tables(self):
+        tables_to_drop = ["TrackPoint", "Activity", "User"]
+        for table in tables_to_drop:
+            drop_query = f"DROP TABLE IF EXISTS {table}"
+            self.cursor.execute(drop_query)
+            print(f"Dropped table: {table}")
+
+        self.db_connection.commit()
+        print("All tables dropped successfully.")
+
 
     def show_tables(self):
         self.cursor.execute("SHOW TABLES")
         rows = self.cursor.fetchall()
         print(tabulate(rows, headers=self.cursor.column_names))
+        
+    def show_table(self, table_name):
+
+            # Execute the query to select all rows from the specified table
+            query = f"SELECT * FROM {table_name}"
+            self.cursor.execute(query)
+            
+            # Fetch all rows from the executed query
+            rows = self.cursor.fetchall()
+            
+            # Print the rows in a tabular format
+            if rows:
+                print(tabulate(rows, headers=self.cursor.column_names, tablefmt="pretty"))
+            else:
+                print(f"The table '{table_name}' is empty or does not exist.")
+
+    
+
+# Gets all files under a certain user
+def get_user_trajectories(user_folder_path):
+    if os.path.isdir(user_folder_path):
+        trajectory_folder_path = os.path.join(user_folder_path, 'Trajectory')
+        
+        if os.path.exists(trajectory_folder_path):
+            return os.listdir(trajectory_folder_path), trajectory_folder_path
+
+# Gets all labels if they exist. Returns a dictionary with (start, end) as key and transportation mode as value.
+def get_user_labels(user_folder_path):
+    labels_dict = {}
+
+    if os.path.isdir(user_folder_path):
+        labels_path = os.path.join(user_folder_path, 'labels.txt')
+
+        if os.path.exists(labels_path):
+            with open(labels_path, 'r') as file:
+                lines = file.readlines()
+
+                # Skip the header line and process the rest
+                for line in lines[1:]:
+                    parts = line.strip().split('\t')
+                    if len(parts) == 3:
+                        start_time, end_time, transportation_mode = parts
+
+                        # Add to dictionary with start_time as key
+                        labels_dict[(start_time, end_time)] = transportation_mode
+
+    return labels_dict
+
+# Splits a line in a plt_file into python variables (4 variables)
+def split_data_line(line):
+    parts = line.strip().split(',')
+
+    latitude = float(parts[0])             # Field 1: Latitude in decimal degrees
+    longitude = float(parts[1])            # Field 2: Longitude in decimal degrees
+                                           # Field 3 is set to 0 for the entire dataset, we can ignore it
+    altitude = int(float(parts[3]))               # Field 4: Altitude in feet (-777 if not valid)
+    date_days = float(parts[4])            # Field 5: Number of days since 12/30/1899
+    date_str = parts[5].strip()            # Field 6: Date as a string (e.g., "2009-10-11")
+    time_str = parts[6].strip()            # Field 7: Time as a string (e.g., "14:04:30")
+
+    # We only care about the timestamp
+    date_time = f"{date_str} {time_str}"
+    
+    return latitude, longitude, altitude, date_days, date_time
 
 
+# ASSUMES THAT THE DATASET IS IN THIS PROJECT FILE, I.E. SAME LEVEL.
 def main():
     program = None
     try:
-        program = DBSetup()
+        db = DBSetup()
 
-        # User table. has_labels can be Null (be default)
-        program.create_table(
+        db.drop_tables()
+
+        # CREATING THE TABLES FOR USER, ACTIVITY AND TRACKPOINT
+
+        db.create_table(
             table_name="User",
             columns_definition="""
                 id VARCHAR(50) NOT NULL PRIMARY KEY,
@@ -61,33 +179,100 @@ def main():
             """
         )
 
-        # Creating the Activity table
-        program.create_table(
+        db.create_table(
             table_name="Activity",
             columns_definition="""
                 id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
                 user_id VARCHAR(50) NOT NULL,
                 transportation_mode VARCHAR(50),
-                start_date_time DATETIME NOT NULL,
-                end_date_time DATETIME NOT NULL,
+                start_date_time DATETIME,
+                end_date_time DATETIME,
                 FOREIGN KEY (user_id) REFERENCES User(id)
             """
         )
 
-        program.create_table(
+        db.create_table(
             table_name="TrackPoint",
             columns_definition="""
                 id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
                 activity_id INT NOT NULL,
-                lat DOUBLE NOT NULL,
-                lon DOUBLE NOT NULL,
+                lat DOUBLE,
+                lon DOUBLE,
                 altitude INT,
                 date_days DOUBLE,
-                date_time DATETIME NOT NULL,
+                date_time DATETIME,
                 FOREIGN KEY (activity_id) REFERENCES Activity(id)
             """
         )
-   
+
+        # EXRACTING THE DATA FROM EACH USER
+        data_folder_path = os.path.join("dataset/dataset/Data")
+        for user_id in os.listdir(data_folder_path):
+            print("user_id")
+
+            if user_id == ".DS_Store":
+                continue
+
+            user_folder_path = os.path.join(data_folder_path, user_id)
+
+            # Check if labels.txt file exists
+            label_dict = get_user_labels(user_folder_path)
+
+            # INSERT DATA INTO USER 
+            if label_dict:
+                db.insert_user(user_id, True)
+            else:
+                db.insert_user(user_id, False)
+
+            # Go through trajectory files of a user
+            plt_files, trajectory_folder_path = get_user_trajectories(user_folder_path)
+            for plt_file in plt_files:
+
+                start, end = "", ""
+
+                if plt_file.endswith(".plt"):
+                    plt_file_path = os.path.join(trajectory_folder_path, plt_file)
+                    
+                    with open(plt_file_path, 'r') as file:
+                        print(f"\nReading file: {plt_file_path}")
+                        lines = file.readlines()
+                        data_lines = lines[6:]
+
+                        if len(data_lines) > 2500:
+                            # SKIP ACTIVITY
+                            continue
+
+                        # INSERT DATA INTO ACTIVITY
+                        activity_id = db.insert_activity(user_id)
+
+                        # CLEANING DATA
+                        trackpoints = []
+                        for i in range(len(data_lines)):
+                            lat, lon, altitude, date_days, date_time  = split_data_line(data_lines[i])
+
+                            if i == 0:
+                                start = date_time
+                            if i == (len(data_lines) - 1):
+                                end = date_time
+
+                            if altitude == -777:
+                                trackpoints.append((activity_id, lat, lon, None, date_days, date_time))
+                            else:
+                                trackpoints.append((activity_id, lat, lon, altitude, date_days, date_time))
+
+                        db.batch_insert_trackpoints(trackpoints)
+                    
+                # ADD ENTRY TO ACTIVITY TABLE, AND CHECKING START AND END FOR LABLE: ERROR HERE!
+
+                q = (start, end) 
+                print("Start END", q)
+                print(label_dict)
+       
+                if (start, end) in label_dict:
+                    transportation_mode = label_dict[(start, end)]
+                    os.abort()
+                    db.update_activity(activity_id, transportation_mode, start, end)
+
         
     except Exception as e:
         print("ERROR: Failed to use database:", e)
@@ -98,3 +283,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    db = DBSetup()
+    db.show_table("Activity")
