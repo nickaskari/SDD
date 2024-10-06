@@ -284,12 +284,12 @@ def main():
 
 if __name__ == '__main__':
     main()
-    db = DBManager()
+    #db = DBManager()
     #db.show_table("Activity", limit=10)
     #db.show_table("TrackPoint", limit=2400)
 
-    query = "SELECT * FROM TrackPoint WHERE altitude < 0 ORDER BY altitude ASC LIMIT 500"
-    negative_altitudes = db.execute_query(query)
+    #query = "SELECT * FROM TrackPoint WHERE altitude < 0 ORDER BY altitude ASC LIMIT 500"
+    #negative_altitudes = db.execute_query(query)
     #db.show_table("User")
 
     
