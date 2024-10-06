@@ -88,6 +88,7 @@ class DBQueries:
 
         self.db.execute_query(transportation_modes_query)
 
+    # PART B) IS NOT FINISHED
     def query_6(self):
         ''' 
             a) Finds the year with the most activities.
@@ -129,6 +130,7 @@ def main():
     print("---------------------------------------------------------")
     queries.query_5()
     print("---------------------------------------------------------")
+    # PART b) IS NOT FINISHED
     queries.query_6()
 
 if __name__ == '__main__':
