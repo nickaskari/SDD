@@ -209,17 +209,17 @@ class DBManager:
 
                             end = date_time
 
+                            if altitude == -777:
+                                trackpoints.append((activity_id, lat, lon, None, date_days, date_time))
+                            else:
+                                trackpoints.append((activity_id, lat, lon, altitude, date_days, date_time))
+
                             if (start, end) in label_dict:
                                 transportation_mode = label_dict[(start, end)]
                                 self.update_activity(activity_id, transportation_mode, start, end)
 
                                 activity_id = self.insert_activity(user_id)
                                 start, end = "", ""
-
-                            if altitude == -777:
-                                trackpoints.append((activity_id, lat, lon, None, date_days, date_time))
-                            else:
-                                trackpoints.append((activity_id, lat, lon, altitude, date_days, date_time))
 
                         self.batch_insert_trackpoints(trackpoints)
 
