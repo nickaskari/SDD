@@ -2,7 +2,7 @@ from DbConnector import DbConnector
 from tabulate import tabulate
 from tqdm import tqdm
 from task1 import DBManager
-from exploreData import haversine
+from Haversine import haversine
 
 class DBQueries:
 
@@ -31,7 +31,7 @@ class DBQueries:
 
         print("Average number of activities per user:\n")
         avg_query = """
-            SELECT AVG(activity_count) 
+            SELECT AVG(activity_count)
             FROM (
                 SELECT COUNT(*) AS activity_count
                 FROM Activity
@@ -40,6 +40,7 @@ class DBQueries:
         """
 
         self.db.execute_query(avg_query)
+
     
     def query_3(self):
         ''' 
@@ -136,19 +137,22 @@ class DBQueries:
                 else:
                     year_hours[activity_year] = duration_hours
 
-            most_hours_year = max(year_hours, key=year_hours.get)
-            total_hours = year_hours[most_hours_year]
+            sorted_year_hours = sorted(year_hours.items(), key=lambda x: x[1], reverse=True)
 
-            print(f"The year with the most recorded hours is {most_hours_year} with {total_hours:.2f} hours.\n")
+            table_data = [[year, hours] for year, hours in sorted_year_hours]
+            headers = ["Year", "Recorded Hours"]
+
+            print(tabulate(table_data, headers=headers, tablefmt="pretty"))
+
 
     def query_7(self):
         ''' 
             Find the total distance (in km) walked in 2008, by user with id=112.
         '''
 
-        print("Total distance walked in 2008 by user with id=112 (only showing first 5 entries):")
+        print("All trackpoints walking in 2008 by user with id=112 (ordered by their activity ids, only showing first 5 entries):")
         trackpoints_query = """
-            SELECT A.user_id, A.transportation_mode, TP.lat, TP.lon
+            SELECT A.id, TP.lat, TP.lon
             FROM TrackPoint TP
             JOIN Activity A ON TP.activity_id = A.id
             WHERE A.user_id = 112 
@@ -159,15 +163,15 @@ class DBQueries:
 
         result = self.db.execute_query_limited(trackpoints_query, None, 5)
 
-        #remove the first and second column of result for further processing
-        result = [row[2:] for row in result]
-
         if result:
             total_distance_m = 0.0
         
             for i in range(1, len(result)):
-                lat1, lon1 = result[i - 1]
-                lat2, lon2 = result[i]
+                id1, lat1, lon1 = result[i - 1]
+                id2, lat2, lon2 = result[i]
+
+                if id1 != id2:
+                    continue
             
                 distance_m = haversine(lat1, lon1, lat2, lon2) # assuming a straight line
                 total_distance_m += distance_m
@@ -184,14 +188,17 @@ class DBQueries:
 
         print("Top 20 users who have gained the most altitude meters:")
         altitude_query = """
-            SELECT A.user_id, TP.altitude, TP.activity_id, TP.date_time
+            SELECT A.user_id, 
+                TP.altitude * 0.3048 AS altitude_meters, 
+                TP.activity_id, 
+                TP.date_time
             FROM TrackPoint TP
             JOIN Activity A ON TP.activity_id = A.id
             WHERE TP.altitude IS NOT NULL
             ORDER BY A.user_id, TP.activity_id, TP.date_time;
         """
 
-        result = self.db.execute_query_limited(altitude_query, None, 10)
+        result = self.db.execute_query_limited(altitude_query, None, 10, printOut=False)
 
         if result:
 
@@ -209,8 +216,9 @@ class DBQueries:
                     prev_alt = None
 
                 if prev_alt is not None:
+
                     alt_diff = alt - prev_alt
-                    if alt_diff > 0:
+                    if alt_diff > 0.0:
                         if user in altitude_gain_per_user:
                             altitude_gain_per_user[user] += alt_diff
                         else:
@@ -218,7 +226,7 @@ class DBQueries:
 
                 prev_alt = alt
                 prev_activity = activity
-                    
+
             top_20 = sorted(altitude_gain_per_user.items(), key = lambda x: x[1], reverse = True)[:20]
 
             print("\nUser ID | Total Meters Gained")
@@ -233,9 +241,9 @@ class DBQueries:
 
     def query_9(self):  
         '''
-        Find all users who have invalid activities, and the number of invalid activities per user
-        - An invalid activity is defined as an activity with consecutive trackpoints where the
-          timestamps deviate with at least 5 minutes. 
+            Find all users who have invalid activities, and the number of invalid activities per user
+            - An invalid activity is defined as an activity with consecutive trackpoints where the
+            timestamps deviate with at least 5 minutes. 
         '''
 
         print("Users with invalid activities and the number of invalid activities per user:")
@@ -246,7 +254,7 @@ class DBQueries:
             ORDER BY A.user_id, A.id, TP.date_time;
         """
 
-        result = self.db.execute_query_limited(invalid_activities_query, None, 10)
+        result = self.db.execute_query_limited(invalid_activities_query, None, 10, printOut=False)
 
         if result:
             invalid_activities = {}
@@ -278,6 +286,7 @@ class DBQueries:
             print("\nUser ID | Number of Invalid Activities")
             for user, count in invalid_activities.items():
                 print(f"{user}     | {count}")
+            print("Affected users =", len(invalid_activities.items()))
 
 
     def query_10(self):
@@ -316,7 +325,7 @@ class DBQueries:
         - Do not count the rows where the mode is null
         '''
 
-        print("Users who have registered transportation_mode and their most used transportation_mode:")
+        print("Users, transportation mode count and how much that transport has been used. (sorted)")
 
         transportation_mode_query = """
             SELECT user_id, transportation_mode, COUNT(*) AS mode_count
@@ -335,6 +344,7 @@ class DBQueries:
                 if user_id not in user_most_used_transportation:
                     user_most_used_transportation[user_id] = (mode, count)
 
+            print("Users who have registered transportation_mode and their most used transportation_mode:")
             print("\nUser ID | Most Used Transportation Mode")
             for user_id in sorted(user_most_used_transportation):
                 print(f"{user_id}     | {user_most_used_transportation[user_id][0]}")

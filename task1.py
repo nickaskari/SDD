@@ -113,7 +113,7 @@ class DBManager:
             return None
 
 
-    def execute_query_limited(self, query, params=None, limit=None):
+    def execute_query_limited(self, query, params=None, limit=None, printOut=True):
         if params:
             self.cursor.execute(query, params)
         else:
@@ -124,11 +124,13 @@ class DBManager:
             rows = self.cursor.fetchall()
             if rows and limit:
                 limited_rows = rows[:limit]  # Limit the number of rows to print
-                print(tabulate(limited_rows, headers=self.cursor.column_names, tablefmt="pretty"))
+                if printOut:
+                    print(tabulate(limited_rows, headers=self.cursor.column_names, tablefmt="pretty"))
             return rows
         else:
             self.db_connection.commit()
-            print("Query executed successfully.")
+            if printOut:
+                print("Query executed successfully.")
             return None
 
     # Gets all files under a certain user
