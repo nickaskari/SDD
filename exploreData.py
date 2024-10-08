@@ -142,7 +142,7 @@ dataset_path = "dataset/dataset"
 
 #explore_dataset(dataset_path)
 
-print_random_plt_file (dataset_path)
+#print_random_plt_file (dataset_path)
 
 
 
