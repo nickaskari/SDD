@@ -93,6 +93,7 @@ class DBManager:
             print(tabulate(rows, headers=self.cursor.column_names, tablefmt="pretty"))
         else:
             print(f"The table '{table_name}' is empty or does not exist.")
+
     
     def execute_query(self, query, params=None):
         if params:
@@ -105,6 +106,25 @@ class DBManager:
             rows = self.cursor.fetchall()
             if rows:
                 print(tabulate(rows, headers=self.cursor.column_names, tablefmt="pretty"))
+            return rows
+        else:
+            self.db_connection.commit()
+            print("Query executed successfully.")
+            return None
+    
+
+    def execute_query_limited(self, query, params=None, limit=None):
+        if params:
+            self.cursor.execute(query, params)
+        else:
+            self.cursor.execute(query)
+
+        # If it's a SELECT statement, fetch and return the results
+        if query.strip().lower().startswith("select"):
+            rows = self.cursor.fetchall()
+            if rows and limit:
+                limited_rows = rows[:limit]  # Limit the number of rows to print
+                print(tabulate(limited_rows, headers=self.cursor.column_names, tablefmt="pretty"))
             return rows
         else:
             self.db_connection.commit()
@@ -285,11 +305,15 @@ def main():
 if __name__ == '__main__':
     main()
     #db = DBManager()
+    
+    #db.show_table("User", limit=10)
     #db.show_table("Activity", limit=10)
-    #db.show_table("TrackPoint", limit=2400)
+    #db.show_table("TrackPoint", limit=10)
 
-    #query = "SELECT * FROM TrackPoint WHERE altitude < 0 ORDER BY altitude ASC LIMIT 500"
+    #query = "SELECT * FROM TrackPoint WHERE altitude < 0 ORDER BY altitude ASC LIMIT 1000"
+
     #negative_altitudes = db.execute_query(query)
+
     #db.show_table("User")
 
     

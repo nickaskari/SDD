@@ -2,6 +2,7 @@ from DbConnector import DbConnector
 from tabulate import tabulate
 from tqdm import tqdm
 from task1 import DBManager
+from exploreData import haversine
 
 class DBQueries:
 
@@ -88,13 +89,13 @@ class DBQueries:
 
         self.db.execute_query(transportation_modes_query)
 
-    # PART B) IS NOT FINISHED
     def query_6(self):
         ''' 
             a) Finds the year with the most activities.
             b) Answers whether the year found is also the year with the most recorded hours.
         '''
 
+        #query a)
         print("The year with the most activities:")
         most_activities_year_query = """
             SELECT activity_year, COUNT(DISTINCT activity_id) AS activity_count
@@ -107,31 +108,197 @@ class DBQueries:
             LIMIT 1;
         """
 
-        result = self.db.execute_query(most_activities_year_query)
+        result_a = self.db.execute_query(most_activities_year_query)
 
-        
+        if result_a:
+            activity_year, activity_count = result_a[0]
+            print(f"The year with the most activities is {activity_year} with {activity_count} activities.\n")
+
+        #query b)
+        print("The year with the most recorded hours (only showing first 5 activites):")
+        most_hours_year_query = """
+            SELECT activity_id, MIN(date_time) AS start_time, MAX(date_time) AS end_time
+            FROM TrackPoint
+            GROUP BY activity_id;
+        """
+
+        result_b = self.db.execute_query_limited(most_hours_year_query, None ,5)
+
+        if result_b:
+            year_hours = {}
+
+            for _, start_time, end_time in result_b:
+                duration_hours = (end_time - start_time).total_seconds() / 3600.0
+                activity_year = start_time.year
+
+                if activity_year in year_hours:
+                    year_hours[activity_year] += duration_hours
+                else:
+                    year_hours[activity_year] = duration_hours
+
+            most_hours_year = max(year_hours, key=year_hours.get)
+            total_hours = year_hours[most_hours_year]
+
+            print(f"The year with the most recorded hours is {most_hours_year} with {total_hours:.2f} hours.\n")
+
+    def query_7(self):
+        ''' 
+            Find the total distance (in km) walked in 2008, by user with id=112.
+        '''
+
+        print("Total distance walked in 2008 by user with id=112 (only showing first 5 entries):")
+        trackpoints_query = """
+            SELECT A.user_id, A.transportation_mode, TP.lat, TP.lon
+            FROM TrackPoint TP
+            JOIN Activity A ON TP.activity_id = A.id
+            WHERE A.user_id = 112 
+                AND A.transportation_mode = 'walk' 
+                AND YEAR(TP.date_time) = 2008
+            ORDER BY A.id, TP.date_time;
+        """
+
+        result = self.db.execute_query_limited(trackpoints_query, None, 5)
+
+        #remove the first and second column of result for further processing
+        result = [row[2:] for row in result]
+
         if result:
-            activity_year, activity_count = result[0]
-            print(f"The year with the most activities is {activity_year} with {activity_count} activities.")
+            total_distance_m = 0.0
+        
+            for i in range(1, len(result)):
+                lat1, lon1 = result[i - 1]
+                lat2, lon2 = result[i]
+            
+                distance_m = haversine(lat1, lon1, lat2, lon2) # assuming a straight line
+                total_distance_m += distance_m
 
+            total_distance_km = total_distance_m / 1000.0
+
+            print(f"Total distance walked in 2008 by user 112: {total_distance_km:.2f} km\n")
+
+    def query_8(self):
+        ''' 
+            Find the top 10 users who have gained the most altitude meters.
+        '''
+        # Here we assume that all altitude values are valid, the cleaning is dealt with in task1.py
+
+        print("Top 20 users who have gained the most altitude meters:")
+        altitude_query = """
+            SELECT A.user_id, TP.altitude, TP.activity_id, TP.date_time
+            FROM TrackPoint TP
+            JOIN Activity A ON TP.activity_id = A.id
+            WHERE TP.altitude IS NOT NULL
+            ORDER BY A.user_id, TP.activity_id, TP.date_time;
+        """
+
+        result = self.db.execute_query_limited(altitude_query, None, 10)
+
+        if result:
+
+            altitude_gain_per_user = {}
+
+            prev_user = None
+            prev_alt = None
+            prev_activity = None
+
+            for user, alt, activity, _ in result:
+                
+                if user != prev_user or activity != prev_activity:
+                    prev_user = user
+                    prev_activity = activity
+                    prev_alt = None
+
+                if prev_alt is not None:
+                    alt_diff = alt - prev_alt
+                    if alt_diff > 0:
+                        if user in altitude_gain_per_user:
+                            altitude_gain_per_user[user] += alt_diff
+                        else:
+                            altitude_gain_per_user[user] = alt_diff
+
+                prev_alt = alt
+                prev_activity = activity
+                    
+            top_20 = sorted(altitude_gain_per_user.items(), key = lambda x: x[1], reverse = True)[:20]
+
+            print("\nUser ID | Total Meters Gained")
+            for user, gain in top_20:
+                print(f"{user}     | {gain:,.0f} m")
+
+            '''
+            from the output we can see that user 128 has the most altitude gain.
+            makes sense because the user has all airplaines records (3/3) 
+            in addition to being a user with a lot of activities.
+            '''
+
+    def query_9(self):  
+        '''
+        Find all users who have invalid activities, and the number of invalid activities per user
+        - An invalid activity is defined as an activity with consecutive trackpoints where the
+          timestamps deviate with at least 5 minutes. 
+        '''
+
+        print("Users with invalid activities and the number of invalid activities per user:")
+        invalid_activities_query = """
+            SELECT A.user_id, A.id AS activity_id, TP.id AS trackpoint_id, TP.date_time
+            FROM TrackPoint TP
+            JOIN Activity A ON TP.activity_id = A.id
+            ORDER BY A.user_id, A.id, TP.date_time;
+        """
+
+        result = self.db.execute_query_limited(invalid_activities_query, None, 10)
+
+        if result:
+            invalid_activities = {}
+
+            prev_user = None
+            prev_activity = None
+            prev_time = None
+
+            for user, activity, _, time in result:
+                if user != prev_user or activity != prev_activity:
+                    prev_user = user
+                    prev_activity = activity
+                    prev_time = None
+
+                if prev_time is not None:
+                    time_diff = (time - prev_time).total_seconds() / 60.0
+                    if time_diff >= 5.0:
+                        if user in invalid_activities:
+                            invalid_activities[user] += 1
+                        else:
+                            invalid_activities[user] = 1
+
+                prev_time = time
+
+            print("\nUser ID | Number of Invalid Activities")
+            for user, count in invalid_activities.items():
+                print(f"{user}     | {count}")
 
 
 def main():
     
     queries = DBQueries()
+    print("\n---------------------------------------------------------\n")
 
     queries.query_1()
-    print("---------------------------------------------------------")
+    print("\n---------------------------------------------------------\n")
     queries.query_2()
-    print("---------------------------------------------------------")
+    print("\n---------------------------------------------------------\n")
     queries.query_3()
-    print("---------------------------------------------------------")
+    print("\n---------------------------------------------------------\n")
     queries.query_4()
-    print("---------------------------------------------------------")
+    print("\n---------------------------------------------------------\n")
     queries.query_5()
-    print("---------------------------------------------------------")
-    # PART b) IS NOT FINISHED
-    queries.query_6()
+    print("\n---------------------------------------------------------\n")
+    #queries.query_6()
+    print("\n---------------------------------------------------------\n")
+    queries.query_7()
+    print("\n---------------------------------------------------------\n")
+    #queries.query_8()
+    print("\n---------------------------------------------------------\n")
+    queries.query_9()
+
 
 if __name__ == '__main__':
     main()
