@@ -250,6 +250,7 @@ class DBQueries:
 
         if result:
             invalid_activities = {}
+            marked_invalid_activities = set()
 
             prev_user = None
             prev_activity = None
@@ -263,7 +264,10 @@ class DBQueries:
 
                 if prev_time is not None:
                     time_diff = (time - prev_time).total_seconds() / 60.0
-                    if time_diff >= 5.0:
+                    
+                    if time_diff >= 5.0 and activity not in marked_invalid_activities:    
+                        marked_invalid_activities.add(activity)
+                    
                         if user in invalid_activities:
                             invalid_activities[user] += 1
                         else:
@@ -276,28 +280,104 @@ class DBQueries:
                 print(f"{user}     | {count}")
 
 
+    def query_10(self):
+        '''
+        Find the users who have tracked an activity in the Forbidden City of Beijing.
+        - In this question you can consider the Forbidden City to have coordinates that 
+            correspond to: lat 39.916, lon 116.397
+        '''
+
+        # Extending 750 meters east-west and 960 meters north-south, The Forbidden City covers 720,000 square meters
+        # Thus, sensible to take a tolerance of 400 meters in each direction
+
+        print("Users who have tracked an activity in the Forbidden City of Beijing:")
+
+        
+        lat_tolerance = 0.00431 # roughly 480 (960/2) meters, north-south
+        lon_tolerance = 0.00337 # roughly 375 (750/2) meters, east-west
+
+        forbidden_city_query = f"""
+            SELECT DISTINCT A.user_id
+            FROM TrackPoint TP
+            JOIN Activity A ON TP.activity_id = A.id
+            WHERE TP.lat BETWEEN {39.916 - lat_tolerance} AND {39.916 + lat_tolerance}
+            AND TP.lon BETWEEN {116.397 - lon_tolerance} AND {116.397 + lon_tolerance};
+        """
+
+        result = self.db.execute_query(forbidden_city_query)
+
+
+    def query_11(self):
+        '''
+        Find all users who have registered transportation_mode and their most used transportation_mode. 
+        - The answer should be on format (user_id, most_used_transportation_mode) sorted on user_id.
+        - Some users may have the same number of activities tagged with e.g. walk and car. In this case
+          it is up to you to decide which transportation mode to include in your answer (choose one).
+        - Do not count the rows where the mode is null
+        '''
+
+        print("Users who have registered transportation_mode and their most used transportation_mode:")
+
+        transportation_mode_query = """
+            SELECT user_id, transportation_mode, COUNT(*) AS mode_count
+            FROM Activity
+            WHERE transportation_mode IS NOT NULL
+            GROUP BY user_id, transportation_mode
+            ORDER BY user_id, mode_count DESC;
+        """
+
+        result = self.db.execute_query(transportation_mode_query)
+
+        if result:
+            user_most_used_transportation = {}
+
+            for user_id, mode, count in result:
+                if user_id not in user_most_used_transportation:
+                    user_most_used_transportation[user_id] = (mode, count)
+
+            print("\nUser ID | Most Used Transportation Mode")
+            for user_id in sorted(user_most_used_transportation):
+                print(f"{user_id}     | {user_most_used_transportation[user_id][0]}")
+
+
+
 def main():
     
     queries = DBQueries()
+    
     print("\n---------------------------------------------------------\n")
-
+    print("Query 1:")
     queries.query_1()
     print("\n---------------------------------------------------------\n")
+    print("Query 2:")
     queries.query_2()
     print("\n---------------------------------------------------------\n")
+    print("Query 3:")
     queries.query_3()
     print("\n---------------------------------------------------------\n")
+    print("Query 4:")
     queries.query_4()
     print("\n---------------------------------------------------------\n")
+    print("Query 5:")
     queries.query_5()
     print("\n---------------------------------------------------------\n")
-    #queries.query_6()
+    print("Query 6:")
+    queries.query_6()
     print("\n---------------------------------------------------------\n")
+    print("Query 7:")
     queries.query_7()
     print("\n---------------------------------------------------------\n")
-    #queries.query_8()
+    print("Query 8:")
+    queries.query_8()
     print("\n---------------------------------------------------------\n")
+    print("Query 9:")
     queries.query_9()
+    print("\n---------------------------------------------------------\n")
+    print("Query 10:")
+    queries.query_10()
+    print("\n---------------------------------------------------------\n")
+    print("Query 11:")
+    queries.query_11()
 
 
 if __name__ == '__main__':

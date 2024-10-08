@@ -150,7 +150,7 @@ def haversine(lat1, lon1, lat2, lon2):
     
     # Radius of Earth in km
     R = 6371.0
-    R_m = 6371.0 * 1000
+    R_m = R * 1000
     
     # Convert latitude and longitude from degrees to radians
     phi1, phi2 = math.radians(lat1), math.radians(lat2)

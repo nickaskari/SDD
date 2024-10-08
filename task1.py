@@ -94,11 +94,11 @@ class DBManager:
         else:
             print(f"The table '{table_name}' is empty or does not exist.")
 
-    
+
     def execute_query(self, query, params=None):
         if params:
             self.cursor.execute(query, params)
-        else:
+        else: 
             self.cursor.execute(query)
 
         # If it's a SELECT statement, fetch and return the results
@@ -111,7 +111,7 @@ class DBManager:
             self.db_connection.commit()
             print("Query executed successfully.")
             return None
-    
+
 
     def execute_query_limited(self, query, params=None, limit=None):
         if params:
@@ -303,8 +303,16 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    #db = DBManager()
+    #main()
+    db = DBManager()
+
+    # show all activity tables for user 010 
+
+    query = """
+        SELECT * FROM Activity WHERE user_id = '100'
+    """
+
+    tables = db.execute_query(query)
     
     #db.show_table("User", limit=10)
     #db.show_table("Activity", limit=10)
