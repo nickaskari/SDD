@@ -95,7 +95,7 @@ class DBQueries:
             b) Answers whether the year found is also the year with the most recorded hours.
         '''
 
-        #query a)
+        # query a)
         print("The year with the most activities:")
         most_activities_year_query = """
             SELECT activity_year, COUNT(DISTINCT activity_id) AS activity_count
@@ -114,7 +114,7 @@ class DBQueries:
             activity_year, activity_count = result_a[0]
             print(f"The year with the most activities is {activity_year} with {activity_count} activities.\n")
 
-        #query b)
+        # query b)
         print("The year with the most recorded hours (only showing first 5 activites):")
         most_hours_year_query = """
             SELECT activity_id, MIN(date_time) AS start_time, MAX(date_time) AS end_time
@@ -122,7 +122,7 @@ class DBQueries:
             GROUP BY activity_id;
         """
 
-        result_b = self.db.execute_query_limited(most_hours_year_query, None ,5)
+        result_b = self.db.execute_query_limited(most_hours_year_query, None, 5)
 
         if result_b:
             year_hours = {}

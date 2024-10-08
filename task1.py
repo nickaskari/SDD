@@ -229,7 +229,7 @@ class DBManager:
 
                             end = date_time
 
-                            if altitude == -777:
+                            if altitude <= -777:
                                 trackpoints.append((activity_id, lat, lon, None, date_days, date_time))
                             else:
                                 trackpoints.append((activity_id, lat, lon, altitude, date_days, date_time))
@@ -290,10 +290,6 @@ def main():
 
         # FILLING THE DATABASE
         db.fill_database()
-
-        # CLEANING SOME DATA AFTER INPUT (setting altitudes that are too negative to NULL)
-        update_query = "UPDATE TrackPoint SET altitude = %s WHERE altitude < %s"
-        db.execute_query(update_query, params=(None, -430))
         
     except Exception as e:
         print("ERROR: Failed to use database:", e)
@@ -303,16 +299,16 @@ def main():
 
 
 if __name__ == '__main__':
-    #main()
-    db = DBManager()
+    main()
+    #db = DBManager()
 
     # show all activity tables for user 010 
 
-    query = """
-        SELECT * FROM Activity WHERE user_id = '100'
-    """
+    #query = """
+     #   SELECT * FROM Activity WHERE user_id = '100'
+    #"""
 
-    tables = db.execute_query(query)
+    #tables = db.execute_query(query)
     
     #db.show_table("User", limit=10)
     #db.show_table("Activity", limit=10)
