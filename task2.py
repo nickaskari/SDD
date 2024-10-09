@@ -139,7 +139,7 @@ class DBQueries:
 
             sorted_year_hours = sorted(year_hours.items(), key=lambda x: x[1], reverse=True)
 
-            table_data = [[year, hours] for year, hours in sorted_year_hours]
+            table_data = [[year, f"{hours:.2f}"] for year, hours in sorted_year_hours]
             headers = ["Year", "Recorded Hours"]
 
             print(tabulate(table_data, headers=headers, tablefmt="pretty"))
