@@ -220,7 +220,6 @@ class DBManager:
                         # INSERT DATA INTO ACTIVITY
                         activity_id = self.insert_activity(user_id)
 
-                        # CLEANING DATA
                         trackpoints = []
 
                         for i in range(len(data_lines)):
