@@ -17,7 +17,7 @@ class DbConnector:
         USER = os.getenv('MONGO_INITDB_ROOT_USERNAME')
         PASSWORD = os.getenv('MONGO_INITDB_ROOT_PASSWORD')
 
-        uri = f"mongodb://{USER}:{PASSWORD}@{HOST}:27017/{DATABASE}"
+        uri = f"mongodb://{USER}:{PASSWORD}@{HOST}:27017/{DATABASE}?authSource=admin"
 
         # Connect to the database
         try:
