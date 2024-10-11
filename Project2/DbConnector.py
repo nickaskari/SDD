@@ -36,7 +36,7 @@ class DbConnector:
         print("Connection to %s-db is closed" % self.db.name)
 
 
-# Example usage
+''' 
 if __name__ == "__main__":
     try:
         db_connector = DbConnector()
@@ -45,3 +45,5 @@ if __name__ == "__main__":
     else:
         if db_connector.db is not None:
             db_connector.close_connection()
+
+'''
