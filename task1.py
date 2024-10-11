@@ -301,24 +301,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-    #db = DBManager()
 
-    # show all activity tables for user 010 
-
-    #query = """
-     #   SELECT * FROM Activity WHERE user_id = '100'
-    #"""
-
-    #tables = db.execute_query(query)
-    
-    #db.show_table("User", limit=10)
-    #db.show_table("Activity", limit=10)
-    #db.show_table("TrackPoint", limit=10)
-
-    #query = "SELECT * FROM TrackPoint WHERE altitude < 0 ORDER BY altitude ASC LIMIT 1000"
-
-    #negative_altitudes = db.execute_query(query)
-
-    #db.show_table("User")
 
     

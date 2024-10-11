@@ -349,7 +349,11 @@ class DBQueries:
             for user_id in sorted(user_most_used_transportation):
                 print(f"{user_id}     | {user_most_used_transportation[user_id][0]}")
 
-
+    def close_connection(self):
+        ''' 
+            Closes connection to database.
+        '''
+        self.db.connection.close_connection()
 
 def main():
     
@@ -388,6 +392,8 @@ def main():
     print("\n---------------------------------------------------------\n")
     print("Query 11:")
     queries.query_11()
+
+    queries.close_connection()
 
 
 if __name__ == '__main__':
