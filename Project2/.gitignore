@@ -1,0 +1,16 @@
+# Ignore the virtual environment directory
+sddpr2/
+.sddpr2/
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore environment files with sensitive information
+.env
+
+# Ignore any IDE project files (e.g., for VS Code)
+.vscode/
