@@ -2,10 +2,6 @@
 sddpr1/
 .sddpr1/
 
-# Ignore dataset directory
-/dataset
-.dataset
-
 # Ignore macOS system files
 .DS_Store
 
