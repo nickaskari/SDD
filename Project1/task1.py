@@ -300,7 +300,36 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    #main()
 
+    db = DBManager()
+
+    # show top 10 rows of each table
+
+    db.show_table("User", limit=11)
+    db.show_table("Activity", limit=10)
+    db.show_table("TrackPoint", limit=10)
+
+    # find the number of activities for each user
+
+    query = """
+        SELECT user_id, COUNT(*) AS number_of_activities
+        FROM Activity
+        GROUP BY user_id
+    """
+
+    db.execute_query(query)
+
+    query = """
+        SELECT *
+        FROM Activity
+        WHERE user_id = '021'
+    """
+
+    db.execute_query(query)
+
+    
+    
+    
 
     
