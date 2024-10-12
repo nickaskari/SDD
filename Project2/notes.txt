@@ -1,0 +1,11 @@
+works:
+- Removing activities with >2500 trackpoint
+- counting activities for users without labels
+- start time and end time for activites is correct. Also records the correct number of trackpoints.
+
+unsure of: 
+- For users with labels, the number of activities is sometimes different from the number of plt files. 
+  Its larger than the num plt files, but different from in the mySQL project. 
+  Always have a number of actvities that is smaller compared to that in project 1 for labelled users. 
+
+
