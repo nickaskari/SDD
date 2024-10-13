@@ -239,7 +239,9 @@ class DBManager:
                                 transportation_mode = label_dict[(start, end)]
                                 self.update_activity(activity_id, transportation_mode, start, end)
 
-                                activity_id = self.insert_activity(user_id)
+                                if i < (len(data_lines) - 1): 
+                                    activity_id = self.insert_activity(user_id)
+
                                 start, end = "", ""
 
                         self.batch_insert_trackpoints(trackpoints)
