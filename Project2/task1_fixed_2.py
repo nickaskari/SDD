@@ -4,6 +4,18 @@ from tqdm import tqdm
 from tabulate import tabulate
 
 
+def flatten_data(document):
+    flattened_doc = {}
+    for key, value in document.items():
+        # show the count instead of the whole list, i.ie. the number of activities or trackpoints
+        if isinstance(value, list):
+            flattened_doc[key] = f"List({len(value)})"  
+        else:
+            flattened_doc[key] = value  # For other data types, keep it as is
+    
+    return flattened_doc
+
+
 class DBManager:
     
     def __init__(self):
@@ -27,17 +39,6 @@ class DBManager:
         for coll in collections:
             print(f" {coll}")
 
-    def flatten_data(self, document):
-        flattened_doc = {}
-        for key, value in document.items():
-            # show the count instead of the whole list, i.ie. the number of activities or trackpoints
-            if isinstance(value, list):
-                flattened_doc[key] = f"List({len(value)})"  
-            else:
-                flattened_doc[key] = value  # For other data types, keep it as is
-        
-        return flattened_doc
-
 
     def show_documents(self, collection_name, limit=None, sort_by=None, sort_order=1):
         """
@@ -51,7 +52,7 @@ class DBManager:
             else:
                 documents = collection.find().limit(limit)
 
-            documents_list = [self.flatten_data(doc) for doc in documents]  # Flatten
+            documents_list = [flatten_data(doc) for doc in documents]  # Flatten
 
             if documents_list:
                 print(f"Displaying up to {limit} documents from the '{collection_name}' collection:")
@@ -64,13 +65,15 @@ class DBManager:
     
     def insert_trackpoints_batch(self, trackpoints):
         if trackpoints:
-            for trackpoint in trackpoints:
-                trackpoint["_id"] = self.trackpoint_counter  # human-readable ID
-                self.trackpoint_counter += 1  
             self.db.TrackPoint.insert_many(trackpoints)
+    
+    def set_trackpoint_id(self, trackpoint):
+        trackpoint["_id"] = self.trackpoint_counter
+        self.trackpoint_counter += 1
+        return trackpoint["_id"]
 
    
-    def insert_activity(self, user_id, transportation_mode=None, start_time=None, end_time=None):
+    def insert_activity(self, user_id, trackpoints, transportation_mode=None, start_time=None, end_time=None):
         activity_id = self.activity_counter  # custom human-readable ID
         activity_doc = {
             "_id": activity_id,  
@@ -78,27 +81,11 @@ class DBManager:
             "transportation_mode": transportation_mode,
             "start_date_time": start_time,
             "end_date_time": end_time,
+            "trackpoints": trackpoints  # List of trackpoint ids (referenced by trackpoints)
         }
-
         result = self.db.Activity.insert_one(activity_doc)
         self.activity_counter += 1  
         return activity_id  
-    
-    def update_activity(self, activity_id, transportation_mode=None, start_time=None, end_time=None):
-        update_fields = {}
-
-        if transportation_mode is not None:
-            update_fields["transportation_mode"] = transportation_mode
-        if start_time is not None:
-            update_fields["start_date_time"] = start_time
-        if end_time is not None:
-            update_fields["end_date_time"] = end_time
-
-        if update_fields:
-            result = self.db.Activity.update_one(
-                {"_id": activity_id},  # Find the document by its activity_id
-                {"$set": update_fields}  
-            )
 
     def insert_user(self, user_id, activity_ids, has_labels):  
         user_doc = {
@@ -181,6 +168,7 @@ class DBManager:
 
                 for plt_file in plt_files:
                     start, end = "", ""
+                    trackpoint_ids = []  # for the current activity
 
                     if plt_file.endswith(".plt"):
                         plt_file_path = os.path.join(trajectory_folder_path, plt_file)
@@ -192,40 +180,43 @@ class DBManager:
                             if len(data_lines) > 2500:
                                 continue  
 
-                            activity_id = self.insert_activity(user_id)
-                            activities.append(activity_id)
-
                             for i in range(len(data_lines)):
                                 lat, lon, altitude, date_days, date_time = self.split_data_line(data_lines[i])
 
                                 if not start:
                                     start = date_time
                                 end = date_time
-
+                 
                                 trackpoint = {
                                     "lat": lat,
                                     "lon": lon,
                                     "altitude": altitude if altitude > -777 else None,
                                     "date_days": date_days,
-                                    "date_time": date_time,
-                                    "activity_id": activity_id
+                                    "date_time": date_time
                                 }
 
+                                trackpoint_id = self.set_trackpoint_id(trackpoint)
+
+                                trackpoint_ids.append(trackpoint_id)
                                 trackpoints_batch.append(trackpoint)
 
                                 if (start, end) in label_dict:
                                     transportation_mode = label_dict[(start, end)]
-                                    self.update_activity(activity_id, transportation_mode, start, end)
-
-                                    if i < (len(data_lines) - 1): 
-                                        activity_id = self.insert_activity(user_id)
-                                        activities.append(activity_id)
-                                        
+                                    activity_id = self.insert_activity(user_id, trackpoint_ids, transportation_mode, start, end)
+                                    activities.append(activity_id)
+                                    trackpoint_ids = []  # Reset for the next activity
                                     start, end = "", ""
 
+                            if trackpoint_ids:
+                                activity_id = self.insert_activity(user_id, trackpoint_ids, None, start, end)
+                                activities.append(activity_id)
 
+                            if len(trackpoints_batch) >= batch_size:
+                                self.insert_trackpoints_batch(trackpoints_batch)
+                                trackpoints_batch = []  
 
-                self.insert_trackpoints_batch(trackpoints_batch)
+                if trackpoints_batch:
+                    self.insert_trackpoints_batch(trackpoints_batch)
 
                 self.insert_user(user_id, activities, bool(label_dict))
                 pbar.update(1) 

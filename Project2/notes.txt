@@ -9,3 +9,46 @@ unsure of:
   Always have a number of actvities that is smaller compared to that in project 1 for labelled users. 
 
 
+
+'''
+    def query_8(self):
+        total_activities = self.db.db.Activity.count_documents({
+            "trackpoints": {"$exists": True, "$ne": []}
+        })
+
+        activities = self.db.db.Activity.find({
+            "trackpoints": {"$exists": True, "$ne": []}
+        })
+
+        altitude_gain_per_user = {}
+
+        for activity in tqdm(activities, desc="Processing activities", total=total_activities):
+            user_id = activity["user_id"]
+            trackpoint_ids = activity["trackpoints"]
+
+            # Fetch corresponding TrackPoints by ID
+            self.db.db.TrackPoint.create_index([("date_time", 1)])
+
+            # Fetch trackpoints with projection and batch size optimization
+            trackpoints = list(self.db.db.TrackPoint.find(
+                {"_id": {"$in": trackpoint_ids}}, 
+            ).sort("date_time", 1))
+
+            prev_altitude = None
+
+            for tp in trackpoints:
+                altitude = tp.get("altitude")
+
+                if altitude is not None and prev_altitude is not None:
+                    alt_diff = altitude - prev_altitude
+                    if alt_diff > 0.0:  # Only count positive gains
+                        altitude_gain_per_user[user_id] = altitude_gain_per_user.get(user_id, 0) + alt_diff * 0.3048  # Convert to meters
+
+                prev_altitude = altitude
+
+        top_10_users = sorted(altitude_gain_per_user.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        print("\nTop 10 users with the most altitude gain:")
+        for user, gain in top_10_users:
+            print(f"User {user}: {gain:,.0f} meters")
+'''
