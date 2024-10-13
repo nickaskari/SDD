@@ -182,7 +182,7 @@ class DBQueries:
         })
 
         activities = self.db.db.Activity.find({
-            "trackpoints": {"$exists": True, "$ne": []}
+            "trackpoints": {"$exists": True, "$ne": []},
         })
 
         altitude_gain_per_user = {}
@@ -314,8 +314,8 @@ class DBQueries:
 def main():
     queries = DBQueries()
 
-    
-
+    queries.query_8()
+    '''
     print("\n---------------------------------------------------------\n")
     print("Query 1:")
     queries.query_1()
@@ -352,7 +352,9 @@ def main():
     print("\n---------------------------------------------------------\n")
     print("Query 11:")
     queries.query_11()
+    '''
 
 
 if __name__ == '__main__':
     main()
+
