@@ -56,143 +56,194 @@ class DBQueries:
 
     def query_6a(self):
         pipeline = [
-            # Convert start_date_time from string to date
-            {"$addFields": {
-                "start_date_time": {
-                    "$dateFromString": {
-                        "dateString": "$start_date_time",
-                        "format": "%Y-%m-%d %H:%M:%S"
+            
+            { "$addFields": {
+                    "date_time": {
+                        "$dateFromString": {
+                            "dateString": "$date_time",
+                            "format": "%Y-%m-%d %H:%M:%S"
+                        }
                     }
                 }
-            }},
-            {"$project": {"year": {"$year": "$start_date_time"}}},
+            },
+
+            { "$addFields": {
+                    "year": { "$year": "$date_time" }
+                }
+            },
+
+            { "$group": {
+                    "_id": { "year": "$year", "activity_id": "$activity_id" },
+                    "count": { "$sum": 1 }  # Ensures unique activity_id per year is counted once
+                }
+            },
             
-            {"$group": {"_id": "$year", "count": {"$sum": 1}}},
+            { "$group": {
+                    "_id": "$_id.year", 
+                    "count": { "$sum": 1 } 
+                    } 
+            },
+
+            { "$sort": { "count": -1 } },
             
-            {"$sort": {"count": -1}},
-            {"$limit": 1}
+            { "$limit": 1 }
         ]
-        result = list(self.db.db.Activity.aggregate(pipeline))
+        
+        result = list(self.db.db.TrackPoint.aggregate(pipeline))
 
         if result:
             print(f"The year with the most activities: {result[0]['_id']} with {result[0]['count']} activities")
-        else:
-            print("fail")
 
     def query_6b(self):
         pipeline = [
-            # Convert start_date_time and end_date_time from strings to dates
-            {"$addFields": {
-                "start_date_time": {
-                    "$dateFromString": {
-                        "dateString": "$start_date_time",
-                        "format": "%Y-%m-%d %H:%M:%S"
-                    }
-                },
-                "end_date_time": {
-                    "$dateFromString": {
-                        "dateString": "$end_date_time",
-                        "format": "%Y-%m-%d %H:%M:%S"
+            { "$addFields": {
+                    "date_time": {
+                        "$dateFromString": {
+                            "dateString": "$date_time",
+                            "format": "%Y-%m-%d %H:%M:%S"
+                        }
                     }
                 }
-            }},
-            # Project the year and duration in milliseconds because of the format
-            {"$project": {
-                "year": {"$year": "$start_date_time"}, 
-                "duration": {"$subtract": ["$end_date_time", "$start_date_time"]}
-            }},
-            # Group by year and calculate total hours
-            {"$group": {"_id": "$year", "total_hours": {"$sum": {"$divide": ["$duration", 3600000]}}}},
-            # Sort by total hours in descending order
-            {"$sort": {"total_hours": -1}},
-            {"$limit": 1}
-        ]
-        
-        result = list(self.db.db.Activity.aggregate(pipeline))
+            },
 
-        # Display the result
+            { "$sort": {
+                    "activity_id": 1,
+                    "date_time": 1
+                }
+            },
+
+            { "$group": {
+                    "_id": {
+                        "activity_id": "$activity_id",
+                        "year": { "$year": "$date_time" }
+                    },
+                    "start_time": { "$first": "$date_time" },
+                    "end_time": { "$last": "$date_time" }
+                }
+            },
+
+            { "$addFields": {
+                    "hours": {
+                        "$divide": [
+                            { "$subtract": ["$end_time", "$start_time"] }, 3600000.0  # Convert milliseconds to hours
+                        ]
+                    }
+                }
+            },
+
+            { "$group": {
+                    "_id": "$_id.year",  # Group by year
+                    "total_hours": { "$sum": "$hours" }  # Sum the total hours for each year
+                }
+            },
+
+            { "$sort": { "total_hours": -1 } },
+
+            { "$limit": 1 }
+        ]
+
+        result = list(self.db.db.TrackPoint.aggregate(pipeline))
+
         if result:
             print(f"The year with the most recorded hours: {result[0]['_id']} with {result[0]['total_hours']:.2f} hours")
-        else:
-            print("fail")
+
 
 
     def query_7(self):
-        pipeline = [
-            # Match activities for user 112 in 2008 with walk 
-            {"$match": {
-                "user_id": "112",
-                "transportation_mode": "walk",
-                "start_date_time": {"$gte": "2008-01-01 00:00:00", "$lt": "2009-01-01 00:00:00"}
-            }},
-            
-            # Unwind the embedded trackpoints array 
-            {"$unwind": "$trackpoints"},
-            
-            # Sort the trackpoints by date_time
-            {"$sort": {"trackpoints.date_time": 1}},
-            
-            # Project the required fields for Haversine calculation
-            {"$project": {
-                "lat": "$trackpoints.lat",
-                "lon": "$trackpoints.lon",
-                "activity_id": "$_id",
-                "date_time": "$trackpoints.date_time"
-            }},
-            
-            # Group by activity and push trackpoints into an array
-            {"$group": {
-                "_id": "$activity_id",
-                "trackpoints": {"$push": {"lat": "$lat", "lon": "$lon"}}
-            }},
-        ]
+        activities_2008 = list(self.db.db.Activity.find({
+            "user_id": "112",
+            "transportation_mode": "walk",
+            "$expr": {
+                "$and": [
+                    { "$eq": [{ "$year": { "$dateFromString": { "dateString": "$start_date_time" }}}, 2008] },
+                    { "$eq": [{ "$year": { "$dateFromString": { "dateString": "$end_date_time" }}}, 2008] }
+                ]
+            }
+        }, ))
 
-        result = list(self.db.db.Activity.aggregate(pipeline))
+        total_distance = 0
 
-        total_distance_km = 0
-        if result:
-            for activity in result:
-                trackpoints = activity['trackpoints']
-                for i in range(1, len(trackpoints)):
-                    lat1, lon1 = trackpoints[i - 1]['lat'], trackpoints[i - 1]['lon']
-                    lat2, lon2 = trackpoints[i]['lat'], trackpoints[i]['lon']
-                    total_distance_km += haversine(lat1, lon1, lat2, lon2)
+        # Creating an index to make it fast
+        self.db.db.TrackPoint.create_index([("activity_id", 1), ("date_time", 1)])
 
-            print(f"Total distance walked in 2008 by user 112: {total_distance_km:.2f} km")
-        else:
-            print("fail")
+        for activity in activities_2008:
+            activity_id = activity["_id"]
+
+            trackpoints = list(self.db.db.TrackPoint.find(
+                { "activity_id": activity_id },
+            ).sort("date_time", 1))
+
+            for i in range(1, len(trackpoints)):
+                prev_point = trackpoints[i - 1]
+                curr_point = trackpoints[i]
+
+                lat1, lon1 = prev_point["lat"], prev_point["lon"]
+                lat2, lon2 = curr_point["lat"], curr_point["lon"]
+
+                if lat1 is not None and lon1 is not None and lat2 is not None and lon2 is not None:
+                    distance = haversine(lat1, lon1, lat2, lon2)
+                    total_distance += distance
+
+        print(f"Total distance walked in 2008 by user 112: {total_distance:.2f} km")
+
 
 
     def query_8(self):
-        activities = self.db.db.Activity.find({
-            "trackpoints": {"$exists": True, "$ne": []}  
-        })
+        pipeline = [
+        # Step 1: Join TrackPoint with Activity on activity_id to get user_id
+        {"$lookup": {
+        "from": "Activity",
+        "localField": "activity_id",
+        "foreignField": "_id",
+        "as": "activity"
+        }},
+        {"$unwind": "$activity"},  # Unwind the joined Activity array
+        {"$addFields": {"user_id": "$activity.user_id", "altitude_meters": {"$multiply": ["$altitude", 0.3048]}}},  # Convert altitude to meters
 
-        altitude_gain_per_user = {}
+        # Step 2: Sort by user_id, activity_id, and date_time
+        {"$sort": {"user_id": 1, "activity_id": 1, "date_time": 1}},
 
-        for activity in activities:
-            user_id = activity["user_id"]
-            trackpoints = activity["trackpoints"]
+        # Step 3: Group trackpoints by user and activity, keeping track of consecutive altitudes
+        {"$group": {
+        "_id": {"user_id": "$user_id", "activity_id": "$activity_id"},
+        "altitudes": {"$push": {"altitude": "$altitude_meters", "date_time": "$date_time"}}  # Store altitudes and timestamps
+        }},
 
-            prev_altitude = None
-            for tp in trackpoints:
-                altitude = tp.get("altitude")
+        # Step 4: Process each group to calculate altitude gain for each activity
+        {"$project": {
+        "altitude_gain": {
+            "$reduce": {
+                "input": "$altitudes",
+                "initialValue": {"sum": 0, "prev_alt": None},
+                "in": {
+                    "$cond": [
+                        {"$and": [{"$ne": ["$$value.prev_alt", None]}, {"$gt": ["$$this.altitude", "$$value.prev_alt"]}]},
+                        {"sum": {"$add": ["$$value.sum", {"$subtract": ["$$this.altitude", "$$value.prev_alt"]}]}, "prev_alt": "$$this.altitude"},
+                        {"sum": "$$value.sum", "prev_alt": "$$this.altitude"}
+                    ]
+                }
+            }
+        }
+        }},
 
-                if altitude is not None and prev_altitude is not None:
-                    alt_diff = altitude - prev_altitude
-                    if alt_diff > 0:
-                        if user_id in altitude_gain_per_user:
-                            altitude_gain_per_user[user_id] += alt_diff * 0.3048
-                        else:
-                            altitude_gain_per_user[user_id] = alt_diff * 0.3048
+        # Step 5: Group by user_id to sum altitude gain across all activities
+        {"$group": {
+        "_id": "$_id.user_id",
+        "total_altitude_gain": {"$sum": "$altitude_gain.sum"}
+        }},
 
-                prev_altitude = altitude
-
-        top_10_users = sorted(altitude_gain_per_user.items(), key=lambda x: x[1], reverse=True)[:10]
-
-        print("\nTop 10 users with the most altitude gain:")
-        for user, gain in top_10_users:
-            print(f"User {user}: {gain:,.0f} meters")
+        # Step 6: Sort by total altitude gain in descending order and limit to top 10 users
+        {"$sort": {"total_altitude_gain": -1}},
+        {"$limit": 10}
+        ]
+        
+        result = list(self.db.db.TrackPoint.aggregate(pipeline))
+        if result:
+            print("Top 10 users with the most altitude gain (in meters):")
+            for user in result:
+                print(f"User {user['_id']}: {user['total_altitude_gain']:.2f} meters")
+        else:
+            print("No data found.")
 
 
     def query_9(self):
@@ -290,6 +341,8 @@ class DBQueries:
 
 def main():
     queries = DBQueries()
+
+    queries.query_8()
 
     print("\n---------------------------------------------------------\n")
     print("Query 1:")
